@@ -85,7 +85,70 @@ class BPETokenizer:
             new_word_splits[tuple(new_symbols)] += freq
 
         return dict(new_word_splits)
+    
+    
+    def tokenize(self, text):
+        words = text.split(' ')
+        tokens = []
+        for word in words:
+            if word:
+                # start with character-level symbols (with end-of-word marker)
+                symbols = list(word) + ["</w>"]
+
+                # apply stored merges in order (greedy replacement per merge)
+                for merge in self.merges:
+                    first, second = merge
+                    merged = first + second
+                    i = 0
+                    new_symbols = []
+                    while i < len(symbols):
+                        if i < len(symbols) - 1 and symbols[i] == first and symbols[i + 1] == second:
+                            new_symbols.append(merged)
+                            i += 2
+                        else:
+                            new_symbols.append(symbols[i])
+                            i += 1
+                    symbols = new_symbols
+
+                # append final tokens (flattened)
+                tokens.extend(symbols)
+        return tokens
+
+    def detokenize(self, tokens):
+        # Reconstruct words from tokens using the end-of-word marker
+        words = []
+        current = ""
+        for tok in tokens:
+            if isinstance(tok, str) and tok.endswith("</w>"):
+                current += tok[:-4]
+                words.append(current)
+                current = ""
+            else:
+                current += tok
+
+        # If any trailing partial word (no </w>), append it
+        if current:
+            words.append(current)
+
+        return " ".join(words)
+    
+    def encode(self, tokens):
+        token_ids = []
+        for token in tokens:
+            if token in self.vocab:
+                token_ids.append(token)
+            else:
+                token_ids.append("<unk>")
+        return token_ids
         
     
     
 tokenizer = BPETokenizer(corpus)
+
+# --- Simple test: tokenize and detokenize a sentence ---
+test_sentence = "This is the second document."
+tokens = tokenizer.tokenize(test_sentence)
+print('\nTest sentence:', test_sentence)
+print('Tokens:', tokens)
+detok = tokenizer.detokenize(tokens)
+print('Detokenized:', detok)
